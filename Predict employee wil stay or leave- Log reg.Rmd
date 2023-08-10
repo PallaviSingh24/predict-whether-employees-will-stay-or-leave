@@ -1,0 +1,296 @@
+---
+title: "HW3 Peer Assessment SUMMER 2023"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+date: "`r format(Sys.time(), '%c %Z')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background
+
+The owner of a company would like to be able to predict whether employees will stay with the company or leave. 
+
+## Data Description
+
+The data contains information about various characteristics of employees. Please note that the dataset has been updated to account for repetitions, which is needed for Goodness of Fit Assessment. See below for the description of these characteristics. 
+
+
+1. **Age.Group**: 1-9 (1 corresponds to teen, 2 corresponds to twenties, etc.) 
+2. **Gender**: 1 if male, 0 if female 
+3. **Tenure**: Number of years with the company 
+4. **Num.Of.Products**: Number of products owned 
+5. **Is.Active.Member**: 1 if active member, 0 if inactive member 
+6. **Staying**: Fraction of employees that stayed with the company for a given set of predicting variables.
+
+## Setup
+
+You can import the data and set up the problem with the following R code:
+
+```{r}
+# Import the data
+data = read.csv("hw3_data.csv", header=TRUE, fileEncoding="UTF-8-BOM")
+
+# Create variable Staying
+data$Staying = data$Stay/data$Employees
+
+# Set variables as categorical
+data$Num.Of.Products<-as.factor(data$Num.Of.Products)
+data$Age.Group<-as.factor(data$Age.Group)
+data$Gender<-as.factor(data$Gender)
+data$Is.Active.Member<-as.factor(data$Is.Active.Member)
+
+# Print head of data
+head(data)
+
+```
+
+# Question 1: Fitting a Model - 9 pts
+
+Fit a logistic regression model using *Staying* as the response variable with *Num.Of.Products* as the predictor and logit as the link function. Ensure to include the weights parameter for specifying the number of trials. Call it **model1**. Note that *Num.Of.Products* should be treated as a categorical variable.
+
+**(a) 3 pts - Display the summary of model1. What are the model parameters and estimates?**
+
+```{r}
+model1= glm(Staying~Num.Of.Products,weights =Employees, family=binomial(link="logit"), data=data)
+summary(model1)
+
+#estimated parameters for intercept is 0.37886 and for Num.Of.Products2 is -1.76683
+
+```
+
+**(b) 3 pts - Write down the equation for the Odds of Staying.**
+
+#Equation for odds of staying = Pstaying/(1-Pstaying)= exp(0.37886+ (-1.76683)*Num.Of.Products2)
+
+
+**(c) 3 pts - Provide a meaningful interpretation for the estimated coefficient for *Num.Of.Products2* with respect to the log-odds of staying and the odds of staying.**
+
+#log-0dds of staying is -1.76683 for log odds of staying has inverse relation with num.of products2 by 1.76683.
+
+#keeping other variables constant, increase in Num.Of.Products2 by one unit will lead to decrease in odds of staying by (1-(exp(-1.76683))) ~.829 or 82.9% 
+
+
+# Question 2: Inference - 9 pts 
+
+**(a) 3 pts - Using model1, find a 90% confidence interval for the coefficient for *Num.Of.Products2*.**
+
+```{r}
+CI= confint(model1, level=.90)
+CI
+
+#90% confidence interval for the coefficient for *Num.Of.Products2 = [-1.9383610 -1.5989652]
+
+```
+
+**(b) 3 pts - Is model1 significant overall at the 0.01 significance level?**
+```{r}
+gstat = model1$null.deviance - deviance(model1)
+cbind(gstat, 1-pchisq(gstat,length(coef(model1))-1))
+
+#P-value is zero so model is overall significant at 0.01 level.
+
+```
+
+
+
+**(c) 3 pts - Which regression coefficients are significantly nonzero at the 0.01 significance level? Which are significantly negative? Why?**
+
+
+Num. of Products2 and intercept both have p values almost 0, so both are significant at0.01 level.
+
+# Question 3: Goodness of fit - 10 pts
+
+**(a) 3.5 pts - Perform goodness-of-fit hypothesis tests using both Deviance and Pearson residuals. What do you conclude? Explain the differences, if any, between these findings and what you found in Question 2b.**
+
+```{r}
+#Deviance test for goodness of fit using deviance residuals
+c(deviance(model1), 1-pchisq(deviance(model1),11))
+
+#goodness of fit using Pearsons residuals
+pearres2 = residuals(model1,type="pearson")
+pearson.tvalue = sum(pearres2^2)
+c(pearson.tvalue, 1-pchisq(pearson.tvalue,11))
+
+#P-value for both is ~0, reject the null hypothesis of good fit.Thus not a good fit.
+
+
+```
+
+**(b) 3.5 pts - Evaluate whether the deviance residuals are normally distributed by producing a QQ plot and histogram of the deviance residuals. What assessments can you make about the goodness of fit of the model1 based on these plots?**
+
+```{r}
+##Residual plots
+
+res = resid(model1,type="deviance")
+qqnorm(res, ylab="Std residuals")
+qqline(res,col="blue",lwd=2)
+hist(res,10,xlab="Std residuals", main="")
+
+# normality assumption holds per histogram as it  shows normal distribution but QQ plot is deviated at the tail.
+
+
+```
+
+**(c) 3 pts - Calculate the estimated dispersion parameter for this model. Is this an overdispersed model?**
+
+```{r}
+#overdispersion parameter= D/(n-p-1)
+
+D1= deviance(model1)
+OD1= D1/(nrow(data)-(length(coef(model1))-1)-1)
+OD1
+
+#It is overdisperd as estimated dispersion parameter for this model is greater than 2.
+
+
+```
+
+# Question 4: Fitting the full model- 23 pts
+
+Fit a logistic regression model using *Staying* as the response variable with *Age.Group*, *Gender*, *Tenure*, *Num.Of.Products*, and *Is.Active.Member* as the predictors and logit as the link function. Ensure to include the weights parameter for specifying the number of trials. Call it **model2**. Note that Age.Group, Gender, Num.Of.Products, and Is.Active.Member should be treated as categorical variables.
+
+```{r}
+model2= glm(Staying~ Age.Group+Gender+Tenure+Num.Of.Products+Is.Active.Member, family =binomial(link=logit),weights = Employees,data=data)
+summary(model2)
+
+```
+
+**(a) 3 pts - Write down the equation for the probability of staying.**
+
+```{r}
+
+(coefficients(summary(model2)))
+
+#prob= 1/(1+exp(-(-0.11+.38Age.Group3+1.734115 Age.Group4+ 2.955578Age.Group5+ -0.5720695Gender1+ 0.003319Tenure+ -1.410946Num.Of.Products2 + -0.840503 Is.Active.Member1 )))
+
+
+#ref-https://towardsdatascience.com/understanding-logistic-regression-using-a-simple-example-163de52ea900
+
+```
+
+**(b) 3 pts - Provide a meaningful interpretation for the estimated coefficients of *Tenure* and *Is.Active.Member1* with respect to the odds of staying.**
+keeping other variables constant, increase in tenure by one unit will lead to decrease in odds of staying by (1-(exp(-0.00331918))) ~0.003313678 or .33% 
+
+keeping other variables constant,if member is active then odds of staying will be (1-exp(-0.85027969)) ~ .5727 or 57% less than member who is not active.
+
+**(c) 3 pts - Is *Is.Active.Member1* statistically significant given the other variables in model2 at the 0.01 significance level?**
+yes, it is significant at 0.01 significance level as p value is close to zero.
+
+
+**(d) 10 pts - Has your goodness of fit been affected? Follow the instructions to repeat the tests, plots, and dispersion parameter calculation you performed in Question 3 with model2.**
+
+**(d-1) Perform goodness-of-fit hypothesis tests using both Deviance and Pearson residuals. What do you conclude?**
+
+```{r}
+#Deviance test for goodness of fit using deviance residuals
+c(deviance(model2), 1-pchisq(deviance(model2),11))
+
+#goodness of fit using Pearsons residuals
+pearres3 = residuals(model2,type="pearson")
+pearson.tvalue = sum(pearres3^2)
+c(pearson.tvalue, 1-pchisq(pearson.tvalue,11))
+
+#p-value is zero for both, thus not good fit.
+
+```
+
+**(d-2) Evaluate the linearity assumption of model2 by plotting the log-odds of Staying vs. Tenure. What do you conclude?**
+
+```{r}
+plot(data$Tenure,log((data$Staying/data$Employees)/(1-data$Staying/data$Employees)), ylab="Logit of staying", main="Scatterplot of logit staying vs
+Tenure", col=c("red","blue"), lwd=3)
+
+#There is no trend between logit of staying vs Tenure.
+
+
+```
+
+**(d-3) Evaluate whether the deviance residuals are normally distributed by producing a QQ plot and histogram of the deviance residuals. What do you conclude?**
+
+```{r}
+
+##Residual plots
+
+res = resid(model2,type="deviance")
+qqnorm(res, ylab="Std residuals")
+qqline(res,col="blue",lwd=2)
+hist(res,10,xlab="Std residuals", main="")
+
+#QQ Plot and histogram shows model hold normality assumption as histogram follows normal distribution and QQ plot is less deviated at the tail than model1. Although histogram follows more normality for model1.
+
+
+
+
+
+```
+
+**(d-4) Calculate the estimated dispersion parameter for this model. Is this an overdispersed model?**
+
+```{r}
+#overdispersion parameter= D/(n-p-1)
+
+D1= deviance(model2)
+OD1= D1/(nrow(data)-(length(coef(model2))-1)-1)
+OD1
+
+#It is not overdisperd as estimated dispersion parameter for this model is less than 2.
+
+
+
+```
+
+**(e) 4 pts - Overall, would you say model2 is a good-fitting model? If so, why? If not, what would you suggest to improve the fit and why? Note: We are not asking you to spend hours finding the best possible model but to offer plausible suggestions along with your reasoning.**
+
+```{r}
+#Model 2 looks better as can be seen from residual plots and deviance and pearson residuals. It can further be improved by removing outliers or transforming data or trying different parameter in weights.
+
+```
+
+# Question 5: Prediction - 9 pts
+
+Suppose there is an employee with the following characteristics:
+
+1. **Age.Group**: 2
+
+2. **Gender**: 0
+
+3. **Tenure**: 2
+
+4. **Num.Of.Products**: 2
+
+5. **Is.Active.Member**: 1
+
+**(a) 3 pts - Predict their probability of staying using model1.**
+
+```{r}
+
+df= data.frame(Age.Group="2",Gender="0",Tenure=2,Num.Of.Products="2",Is.Active.Member="1")
+df
+pred_model1= predict(model1,df,type='response')
+pred_model1
+
+
+
+```
+
+**(b) 3 pts - Predict their probability of staying using model2.**
+
+```{r}
+#perdict using model2
+
+
+
+df= data.frame(Age.Group="2",Gender="0",Tenure=2,Num.Of.Products="2",Is.Active.Member="1")
+df
+pred_model2= predict(model2,df,type='response')
+pred_model2
+```
+
+**(c) 3 pts - Comment on how your predictions compare.i.e. which model is more reliable based on the analysis?**
+
+Model 1 predicts 19.9% probabilty of staying while model2 8%. As model2 looks better per our analysis, i think that may be more reliable.
